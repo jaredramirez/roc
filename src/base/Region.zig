@@ -1,7 +1,7 @@
 const std = @import("std");
 const collections = @import("../collections.zig");
 
-const Region = @This();
+const Self = @This();
 
 start: Position,
 end: Position,
@@ -11,14 +11,14 @@ pub const List = collections.SafeList(@This());
 pub const Idx = List.Idx;
 pub const Slice = List.Slice;
 
-pub fn zero() Region {
-    return Region{
+pub fn zero() Self {
+    return Self{
         .start = Position.zero(),
         .end = Position.zero(),
     };
 }
 
-pub fn format(self: *const Region, comptime fmt: []const u8, _: std.fmt.FormatOptions, writer: std.io.AnyWriter) !void {
+pub fn format(self: *const Self, comptime fmt: []const u8, _: std.fmt.FormatOptions, writer: std.io.AnyWriter) !void {
     if (fmt.len != 0) {
         std.fmt.invalidFmtError(fmt, self);
     }
