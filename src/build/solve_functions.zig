@@ -1,9 +1,12 @@
 const std = @import("std");
 const base = @import("../base.zig");
+const problem = @import("../problem.zig");
+const types = @import("../types.zig");
 const func_lift = @import("./lift_functions.zig");
 const collections = @import("../collections.zig");
 
 const testing = std.testing;
+const IR = func_lift.IR;
 const Ident = base.Ident;
 
 pub const FunctionSet = struct {
@@ -49,8 +52,78 @@ test "solves for uncaptured functions" {
     // resulting FunctionSet.List correctly labels each function
 
     const gpa = testing.allocator;
-    var store = base.Ident.Store.init(gpa);
-    defer store.deinit();
+
+    var moduleEnv = base.ModuleEnv.init(gpa);
+    defer moduleEnv.deinit();
+
+    var ir = IR.init(&moduleEnv, gpa);
+    defer ir.deinit();
+
+    // Types
+
+    // U8 primitive type
+    const u8_type = IR.Type{ .primitive = types.Primitive{ .Int = types.Primitive.Int.U8 } };
+    const u8_idx = ir.types.append(u8_type);
+
+    // U8 -> U8 type
+    var u8_to_u8_ret_args = IR.Type.List.init(gpa);
+    defer u8_to_u8_ret_args.deinit();
+    _ = u8_to_u8_ret_args.append(u8_type);
+    _ = u8_to_u8_ret_args.append(u8_type);
+    const u8_to_u8_ret_args_slice = IR.Type.NonEmptySlice.makeUnchecked(u8_to_u8_ret_args.items.items[0..]);
+    const u8_to_u8 = IR.Type{ .func = .{ .ret_then_args = u8_to_u8_ret_args_slice } };
+    const u8_to_u8_idx = ir.types.append(u8_to_u8);
+
+    // Apply arg `f`
+
+    const apply_arg_f_ident = base.Ident.for_text("f");
+    const apply_arg_f_ident_idx = moduleEnv.idents.insert(apply_arg_f_ident, base.Region.zero());
+
+    const apply_arg_a_ident = base.Ident.for_text("a");
+    const apply_arg_a_ident_idx = moduleEnv.idents.insert(apply_arg_a_ident, base.Region.zero());
+
+    // Idents
+
+    const apply_arg_x_ident = base.Ident.for_text("x");
+    _ = moduleEnv.idents.insert(apply_arg_x_ident, base.Region.zero());
+
+    const apply_ident = base.Ident.for_text("apply");
+    _ = moduleEnv.idents.insert(apply_ident, base.Region.zero());
+
+    // Exprs
+
+    // Is Lookup right here?
+    const apply_arg_f_lookup_expr = IR.Expr{ .lookup = .{
+        .ident = apply_arg_f_ident_idx,
+        .type = u8_to_u8_idx,
+    } };
+    const apply_arg_f_lookup_expr_idx = ir.exprs.append(apply_arg_f_lookup_expr);
+
+    const apply_arg_a_lookup_expr = IR.Expr{ .lookup = .{
+        .ident = apply_arg_a_ident_idx,
+        .type = u8_idx,
+    } };
+    const apply_arg_a_lookup_expr_idx = ir.exprs.append(apply_arg_a_lookup_expr);
+
+    var f_args = IR.Expr.Typed.List.init(gpa);
+    defer f_args.deinit();
+    _ = f_args.append(IR.Expr.Typed{ .expr = apply_arg_a_lookup_expr_idx, .type = u8_idx });
+
+    const f_x_expr = IR.Expr{ .call = .{ .fn_type = u8_to_u8_idx, .fn_expr = apply_arg_f_lookup_expr_idx, .args = f_args.items.slice() } };
+    const f_x_expr_idx = ir.exprs.append(f_x_expr);
+
+    var apply_args = IR.Pattern.List.init(gpa);
+    _ = apply_args.append(IR.Pattern{ .identifier = apply_arg_f_ident_idx });
+    _ = apply_args.append(IR.Pattern{ .identifier = apply_arg_a_ident_idx });
+    defer apply_args.deinit();
+
+    _ = IR.Function{
+        .args = apply_args.items.items[0..],
+        .return_type = u8_idx,
+        .expr = f_x_expr_idx,
+    };
+
+    // ir.exposed_functions.put(apply_ident, apply_def);
 
     try testing.expect(true);
 }
