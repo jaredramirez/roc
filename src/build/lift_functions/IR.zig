@@ -38,8 +38,8 @@ pub fn init(env: *base.ModuleEnv) Self {
 
 /// todo
 pub fn deinit(self: *Self) void {
-    self.exposed_values.deinit(self.env.gpa);
-    self.exposed_functions.deinit(self.env.gpa);
+    self.exposed_values.deinit();
+    self.exposed_functions.deinit();
     self.types.deinit(self.env.gpa);
     self.exprs.deinit(self.env.gpa);
     self.typed_exprs.deinit(self.env.gpa);
@@ -74,7 +74,8 @@ pub const Type = union(enum) {
 pub const Expr = union(enum) {
     let: Def,
     str: StringLiteral,
-    number: base.Literal.Num,
+    int: base.IntLiteral,
+    float: base.FloatLiteral,
     list: struct {
         elem_type: Type.Idx,
         elems: Expr.Slice,
@@ -89,6 +90,7 @@ pub const Expr = union(enum) {
         fn_expr: Expr.Idx,
         args: Expr.Typed.Slice,
     },
+    function: Function,
 
     function_pack: struct {
         ident: Ident.Idx,
@@ -198,7 +200,8 @@ pub const Pattern = union(enum) {
         ident: Ident.Idx,
     },
     str_literal: StringLiteral.Idx,
-    number_literal: base.Literal.Num,
+    int_literal: base.IntLiteral,
+    float_literal: base.FloatLiteral,
     applied_tag: struct {
         tag_union_type: Type.Idx,
         tag_name: Ident.Idx,
