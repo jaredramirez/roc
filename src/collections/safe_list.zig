@@ -197,6 +197,53 @@ pub fn SafeMultiList(comptime T: type) type {
             return @enumFromInt(@as(u32, @intCast(length)));
         }
 
+        /// Add a items to the end of this list, returning Slice into of the elements
+        pub fn append_slice(self: *SafeMultiList(T), gpa: Allocator, elems: []const T) Slice {
+            if (elems.len < 1) {
+                return .{
+                    .ptrs = undefined,
+                    .len = self.items.len,
+                    .capacity = self.items.capacity,
+                };
+            }
+
+            const first_index = self.items.len;
+
+            const next_capacity = self.items.capacity + elems.len;
+            self.items.ensureTotalCapacity(gpa, next_capacity) catch |err| exitOnOom(err);
+
+            for (elems) |elem| {
+                self.items.appendAssumeCapacity(elem);
+            }
+
+            return self.slice_from(first_index);
+        }
+
+        /// Just like MulitList slice, but starts each field slice from an offset
+        pub fn slice_from(self: SafeMultiList(T), from: usize) Slice {
+            std.debug.assert(from <= self.items.len);
+
+            const base = self.items.slice();
+
+            var new_ptrs: [base.ptrs.len][*]u8 = undefined;
+
+            // This has to be inline, so `cur_field` can be known at comptime
+            inline for (0..base.ptrs.len) |i| {
+                const cur_field = @as(Field, @enumFromInt(i));
+                const cur_items = base.items(cur_field);
+                new_ptrs[i] = if (cur_items.len == 0)
+                    undefined
+                else
+                    @ptrCast(&cur_items[from]);
+            }
+
+            return .{
+                .ptrs = new_ptrs,
+                .len = base.len - from,
+                .capacity = base.capacity - from,
+            };
+        }
+
         /// Set the value of an element in this list.
         pub fn set(self: *SafeMultiList(T), idx: Idx, value: T) void {
             self.items.set(@intFromEnum(idx), value);
@@ -256,4 +303,30 @@ test "safe list_u32 inserting and getting" {
     const item = list_u32.get(id);
 
     try testing.expectEqual(item.*, 1);
+}
+
+test "multilist appendSlice" {
+    const gpa = testing.allocator;
+
+    const Struct = struct { num: u32, char: u8 };
+    const StructMultiList = SafeMultiList(Struct);
+
+    var multilist = StructMultiList.initCapacity(gpa, 3);
+    defer multilist.deinit(gpa);
+
+    _ = multilist.append(gpa, .{ .num = 100, .char = 'a' });
+    _ = multilist.append(gpa, .{ .num = 200, .char = 'b' });
+    _ = multilist.append(gpa, .{ .num = 300, .char = 'c' });
+
+    const slice = multilist.append_slice(gpa, &[_]Struct{ .{ .num = 400, .char = 'd' }, .{ .num = 500, .char = 'e' }, .{ .num = 600, .char = 'f' } });
+
+    const num_slice = slice.items(.num);
+    try testing.expectEqual(400, num_slice[0]);
+    try testing.expectEqual(500, num_slice[1]);
+    try testing.expectEqual(600, num_slice[2]);
+
+    const char_slice = slice.items(.char);
+    try testing.expectEqual('d', char_slice[0]);
+    try testing.expectEqual('e', char_slice[1]);
+    try testing.expectEqual('f', char_slice[2]);
 }
