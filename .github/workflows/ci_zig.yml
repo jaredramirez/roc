@@ -47,17 +47,13 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v4
-            - name: Enable long paths on windows
-              if: ${{ startsWith(matrix.os, 'windows') }}
-              run: |
-                  REG ADD "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
             - uses: mlugg/setup-zig@v1
               with:
                 version: 0.14.0
 
             - name: build roc
               run: |
-                zig build -Dllvm -Dfuzz -Dsystem-afl=false
+                zig build -Dllvm -Dfuzz -Dsystem-afl=false --verbose
 
             - name: roc executable minimal check (Unix)
               if: runner.os != 'Windows'
