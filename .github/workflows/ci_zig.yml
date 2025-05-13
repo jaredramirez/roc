@@ -53,7 +53,7 @@ jobs:
 
             - name: build roc
               run: |
-                zig build -Dllvm -Dfuzz -Dsystem-afl=false --verbose
+                zig build -Dllvm -Dfuzz -Dsystem-afl=false --verbose-cc --verbose-link --verbose
 
             - name: roc executable minimal check (Unix)
               if: runner.os != 'Windows'
